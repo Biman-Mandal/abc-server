@@ -13,6 +13,7 @@ import bannerRouter from "./app/routes/banner.route";
 import couponRouter from "./app/routes/coupon.route";
 import supportRouter from "./app/routes/support.route";
 import helpCenter from "./app/routes/helpCenter.route";
+import emergencyContact from "./app/routes/emergencyContact.route";
 export const app: Application = express();
 
 app.use(cors());
@@ -33,6 +34,7 @@ app.use("/api/ride/", rideRouter);
 app.use("/api/mobile/banner", bannerRouter);
 app.use("/api/support", supportRouter);
 app.use("/api/help-center", helpCenter);
+app.use("/api/emergency-contact", emergencyContact);
 app.get("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
     res.status(200).json({
