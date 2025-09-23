@@ -192,8 +192,7 @@ export const permanentDeleteHelpCenter = async (
 
     res.status(200).json({
       success: true,
-      message: "Help center item permanently deleted",
-      data: deletedHelpCenter,
+      message: "Help center item deleted",
     });
   } catch (error) {
     next(error);
