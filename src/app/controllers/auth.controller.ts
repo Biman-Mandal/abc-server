@@ -156,13 +156,19 @@ export const getMyProfile = async (
   const authUser = req.user as JwtPayload;
   try {
     const user = await User.findById(authUser._id).select("-__v");
+
     if (!user) {
       return res
         .status(404)
         .json({ success: false, message: "User not found" });
     }
-    res.status(200).json({ success: true, user });
+
+    // convert mongoose doc -> plain object
+    const userObj = user.toObject();
+    userObj.rating = "4.5";
+    return res.status(200).json({ success: true, user: userObj });
   } catch (error) {
     next(error);
   }
 };
+
