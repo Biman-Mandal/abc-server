@@ -5,6 +5,7 @@ import {
   getRideStatus,
   updateRideStatus,
   cancelRide,
+  rideHistory,
 } from "../controllers/ride.controller";
 import { auth } from "../middleware/auth";
 
@@ -19,5 +20,7 @@ rideRouter.get("/:rideId/status", auth, getRideStatus);
 rideRouter.patch("/:rideId/update-status", auth, updateRideStatus);
 
 rideRouter.post("/:rideId/cancel", auth, cancelRide);
+
+rideRouter.post("/history", auth, rideHistory);
 
 export default rideRouter;

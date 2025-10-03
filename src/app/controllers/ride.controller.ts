@@ -202,3 +202,52 @@ export const cancelRide = async (
     next(error);
   }
 };
+
+export const rideHistory = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const user = req.user as { role?: string; _id: any };
+  const role = req.role as { role: any };
+
+  try {
+    let rides;
+    const { status } = req.query;
+
+    const query: any = {};
+    if (role === "user") {
+      query.user = user._id;
+    } else if (role === "driver") {
+      query.driver = user._id;
+    } else {
+      return res.status(403).json({ message: "Unauthorized role" });
+    }
+
+    if (status) {
+      query.status = status;
+    }
+
+    rides = await Ride.find(query)
+      .sort({ createdAt: -1 })
+      .populate(
+        role === "user"
+          ? { path: "driver", select: "driverName vehicleModel vehicleNumber profileImage" }
+          : { path: "user", select: "name phoneNumber profilePictureUrl" }
+      );
+
+    const ridesWithRating = rides.map((ride: any) => ({
+      ...ride.toObject(),
+      rating: 4.5,
+    }));
+
+    return res.status(200).json({
+      success: true,
+      message: "Ride History Fetched Successfully.",
+      data: ridesWithRating,
+      count: ridesWithRating.length,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

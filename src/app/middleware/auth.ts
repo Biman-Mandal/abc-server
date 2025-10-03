@@ -45,6 +45,7 @@ export const auth = async (req: Request, res: Response, next: NextFunction) => {
     }
 
     req.user = user;
+    req.role = decoded.role;
     next();
   } catch (error) {
     res.status(401).json({
