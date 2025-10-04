@@ -4,6 +4,8 @@ import { getIoInstance } from "../socket/socket";
 import { Iuser } from "../interfaces/user.interface";
 import { IDriver } from "../interfaces/driver.interface";
 import mongoose from "mongoose";
+import { calculateAverageRating } from "../utils/rating.util"; // the common function we created earlier
+import Rating from "../models/rating.model";
 
 export const requestRide = async (
   req: Request,
@@ -236,10 +238,28 @@ export const rideHistory = async (
           : { path: "user", select: "name phoneNumber profilePictureUrl" }
       );
 
-    const ridesWithRating = rides.map((ride: any) => ({
-      ...ride.toObject(),
-      rating: 4.5,
-    }));
+    // Assuming 'rides' is an array of Mongoose documents
+    const ridesWithRating = await Promise.all(
+      rides.map(async (ride: any) => {
+        const rideObj = ride.toObject();
+
+        // Determine whose rating to fetch
+        const rateableType = role === "user" ? "Driver" : "User";
+        const rateableId = role === "user" ? rideObj.driver._id : rideObj.user._id;
+
+        // Fetch rating for this ride by the other party
+        const ratingDoc = await Rating.findOne({
+          ride_id: rideObj._id,
+          rateable_type: rateableType,
+          rateable_id: rateableId,
+        });
+
+        rideObj.rating = ratingDoc?.rating?.toFixed(1) || "0.0";
+
+        return rideObj;
+      })
+    );
+
 
     return res.status(200).json({
       success: true,
