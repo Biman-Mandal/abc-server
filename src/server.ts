@@ -9,6 +9,7 @@ import User from "./app/models/user.model";
 import {Driver} from "./app/models/driver.model";
 import Ride from "./app/models/ride.model";
 import mongoose from "mongoose";
+import { calculateAverageRating } from "./app/utils/rating.util"; // the common function we created earlier
 
 const PORT = process.env.PORT || 8080;
 
@@ -31,11 +32,31 @@ async function restoreLatestRide(socket: any, userId: string, isDriver: any) {
     ).sort({ createdAt: -1 });
 
     if (ride) {
-      const populatedRide = await ride.populate(
-        isDriver
-          ? { path: "user", select: "name phoneNumber profilePictureUrl" }
-          : { path: "driver", select: "driverName vehicleModel vehicleNumber rating profileImage" }
-      );
+      let populatedRide;
+
+      if (isDriver) {
+        // Populate user info
+        populatedRide = await ride.populate({ path: "user", select: "name phoneNumber profilePictureUrl" });
+
+        // Convert to plain object to safely add rating
+        const rideObj = populatedRide.toObject();
+
+        const userRating = await calculateAverageRating("User", rideObj.user._id);
+        rideObj.user.rating = userRating.averageRating?.toFixed(1) || "0.0";
+
+        populatedRide = rideObj;
+      } else {
+        // Populate driver info
+        populatedRide = await ride.populate({ path: "driver", select: "driverName vehicleModel vehicleNumber profileImage" });
+
+        // Convert to plain object
+        const rideObj = populatedRide.toObject();
+
+        const driverRating = await calculateAverageRating("Driver", rideObj.driver._id);
+        rideObj.driver.rating = driverRating.averageRating?.toFixed(1) || "0.0";
+
+        populatedRide = rideObj;
+      }
 
       // ✅ Send ride details back to THIS client
       socket.emit("restoreRide", populatedRide);

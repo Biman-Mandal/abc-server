@@ -3,6 +3,7 @@ import jwt, { JwtPayload } from "jsonwebtoken";
 import User from "../models/user.model";
 import path from "path";
 import { generateOtp, sendSms } from "../services/sms.service";
+import { calculateAverageRating } from "../utils/rating.util"; // the common function we created earlier
 
 const JWT_SECRET = process.env.JWT_SECRET as string;
 const JWT_EXPIRES_IN = (process.env.JWT_EXPIRES_IN ||
@@ -165,7 +166,8 @@ export const getMyProfile = async (
 
     // convert mongoose doc -> plain object
     const userObj = user.toObject();
-    userObj.rating = "4.5";
+    const totalRating = await calculateAverageRating("User", userObj._id);
+    userObj.rating = totalRating.averageRating?.toFixed(1) || "0.0";
     return res.status(200).json({ success: true, user: userObj });
   } catch (error) {
     next(error);
