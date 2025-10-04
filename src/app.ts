@@ -20,6 +20,7 @@ import vehicleRoutes from "./app/routes/vehicle.route";
 import vehiclePriceRoutes from "./app/routes/vehiclePrice.route";
 import vehicleTypeRoutes from "./app/routes/vehicleType.route";
 import userRoutes from "./app/routes/user.route";
+import ratingRoutes from "./app/routes/rating.route";
 
 export const app: Application = express();
 
@@ -48,6 +49,7 @@ app.use("/api/vehicle-type", vehicleTypeRoutes);
 app.use("/api/vehicle-price", vehiclePriceRoutes);
 app.use("/api/vehicles", vehicleRoutes);
 app.use("/api/user", userRoutes);
+app.use("/api/rating", ratingRoutes);
 app.get("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
     res.status(200).json({
