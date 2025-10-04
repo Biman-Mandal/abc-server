@@ -5,6 +5,8 @@ export interface IDriver {
   email: string; // Changed from phone
   phone: string; // Made phone optional or can be primary
   password: string;
+  vehicleTypeId: Types.ObjectId;
+  vehicleId: Types.ObjectId;
 
   vehicleType: "bike" | "car" | "truck" | "bus" | "auto" | "toto";
   vehicleNumber: string;

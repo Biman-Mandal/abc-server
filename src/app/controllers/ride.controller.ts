@@ -145,7 +145,7 @@ export const updateRideStatus = async (
     await ride.save();
 
     const io = getIoInstance();
-    const notificationData = { rideId: ride._id, status: ride.status };
+    const notificationData = { rideId: ride._id, status: ride.status, user_id: ride.user, driver_id: ride.driver };
     io.to(ride.user.toString()).emit("rideStatusUpdated", notificationData);
     if (ride.driver) {
       io.to(ride.driver.toString()).emit("rideStatusUpdated", notificationData);

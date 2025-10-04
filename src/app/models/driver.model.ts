@@ -1,10 +1,6 @@
-import { Schema, model } from "mongoose";
-import bcrypt from "bcrypt";
-import {
-  IDriver,
-  IDriverMethods,
-  DriverModelType,
-} from "../interfaces/driver.interface";
+import { Schema, model } from "mongoose"
+import bcrypt from "bcrypt"
+import type { IDriver, DriverModelType } from "../interfaces/driver.interface"
 
 const driverSchema = new Schema<IDriver, DriverModelType>(
   {
@@ -34,11 +30,22 @@ const driverSchema = new Schema<IDriver, DriverModelType>(
       select: false, // Hide password by default
     },
 
+    vehicleTypeId: {
+      type: Schema.Types.ObjectId,
+      ref: "VehicleType",
+      required: [true, "Vehicle type id is required"],
+    },
+    vehicleId: {
+      type: Schema.Types.ObjectId,
+      ref: "Vehicle",
+      required: [true, "Vehicle id is required"],
+    },
     vehicleType: {
       type: String,
       enum: ["bike", "car", "truck", "bus", "auto", "toto"],
-      required: true,
+      required: false, // previously required: true
     },
+
     vehicleNumber: {
       type: String,
       trim: true,
@@ -157,4 +164,4 @@ driverSchema.methods.comparePassword = async function (
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-export const Driver = model<IDriver, DriverModelType>("Driver", driverSchema);
+export const Driver = model<IDriver, DriverModelType>("Driver", driverSchema)
