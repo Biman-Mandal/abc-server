@@ -8,6 +8,7 @@ import mongoDb from "./app/config/db";
 import User from "./app/models/user.model";
 import {Driver} from "./app/models/driver.model";
 import Ride from "./app/models/ride.model";
+import mongoose from "mongoose";
 
 const PORT = process.env.PORT || 8080;
 
@@ -50,60 +51,76 @@ async function restoreLatestRide(socket: any, userId: string, isDriver: any) {
 }
 
 io.on("connection", async (socket) => {
-  console.log(`New client connected: ${socket.id}`);
-  const userId = socket.handshake.query.userId as string;
-  const isDriver = socket.handshake.query.isDriver as string;
-  if (!userId) {
-    console.log("No userId provided. Disconnecting socket:", socket.id);
+  console.log(`🚀 New client connected: ${socket.id}`);
+
+  const userId = socket.handshake.query.userId?.toString();
+  const isDriver = socket.handshake.query.isDriver === "true";
+
+  if (!userId || userId === "null" || userId === "undefined") {
+    console.error(`❌ No valid userId provided. Disconnecting socket: ${socket.id}`);
     socket.disconnect();
     return;
   }
 
-  if(isDriver){
-    // Check if user exists in DB
-    const driverExits = await Driver.exists({ _id: userId });
-    if (!driverExits) {
-      console.log(
-        `Driver ID ${userId} does not exist. Disconnecting socket:`,
-        socket.id
-      );
+  try {
+    // Validate Mongo ObjectId before querying
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      console.error(`⚠️ Invalid userId (${userId}). Disconnecting socket: ${socket.id}`);
       socket.disconnect();
       return;
     }
-  }else{
-    // Check if user exists in DB
-    const userExists = await User.exists({ _id: userId });
-    if (!userExists) {
-      console.log(
-        `User ID ${userId} does not exist. Disconnecting socket:`,
-        socket.id
-      );
-      socket.disconnect();
-      return;
-    } 
-  }
-  socket.join(userId);
 
-   // On connect, immediately try restore
-  restoreLatestRide(socket, userId, isDriver);
+    if (isDriver) {
+      // Check if driver exists
+      const driverExists = await Driver.exists({ _id: userId });
+      if (!driverExists) {
+        console.error(`❌ Driver ID ${userId} not found. Disconnecting socket: ${socket.id}`);
+        socket.disconnect();
+        return;
+      }
+    } else {
+      // Check if user exists
+      const userExists = await User.exists({ _id: userId });
+      if (!userExists) {
+        console.error(`❌ User ID ${userId} not found. Disconnecting socket: ${socket.id}`);
+        socket.disconnect();
+        return;
+      }
+    }
 
-  // Also expose an event for manual restore
-  socket.on("getRestoreRide", async () => {
+    // ✅ If all good, join socket room
+    socket.join(userId);
+    console.log(`✅ Socket ${socket.id} joined room ${userId}`);
+
+    // Restore ride state
     await restoreLatestRide(socket, userId, isDriver);
-  });
 
-  socket.on("updateLocation", (data) => {
-    socket.broadcast.emit("driverLocationUpdated", data);
-  });
+    // Manual restore event
+    socket.on("getRestoreRide", async () => {
+      await restoreLatestRide(socket, userId, isDriver);
+    });
 
-  socket.on("rideRequest", (rideDetails) => {
-    console.log("Ride request received:", rideDetails);
-  });
+    // Driver location updates
+    socket.on("updateLocation", (data) => {
+      socket.broadcast.emit("driverLocationUpdated", data);
+    });
 
-  socket.on("disconnect", () => {
-    console.log(`Client disconnected: ${socket.id}`);
-  });
+    // Ride request
+    socket.on("rideRequest", (rideDetails) => {
+      console.log("📦 Ride request received:", rideDetails);
+    });
+
+    // Disconnect event
+    socket.on("disconnect", () => {
+      console.log(`👋 Client disconnected: ${socket.id}`);
+    });
+
+  } catch (error) {
+    console.error(`💥 Error in socket connection (${socket.id}):`, error);
+    socket.disconnect();
+  }
 });
+
 
 async function main() {
   try {
