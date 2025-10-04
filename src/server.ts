@@ -54,7 +54,7 @@ io.on("connection", async (socket) => {
   console.log(`🚀 New client connected: ${socket.id}`);
 
   const userId = socket.handshake.query.userId?.toString();
-  const isDriver = socket.handshake.query.isDriver === "true";
+  const isDriver = socket.handshake.query.isDriver;
 
   if (!userId || userId === "null" || userId === "undefined") {
     console.error(`❌ No valid userId provided. Disconnecting socket: ${socket.id}`);
