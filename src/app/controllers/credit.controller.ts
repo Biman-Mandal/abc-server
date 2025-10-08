@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express"
 import mongoose from "mongoose"
 import Credit from "../models/credit.model"
 import Ride from "../models/ride.model"
+import { getIoInstance } from "../socket/socket";
 
 /**
  * Helper to read platform fee percent (e.g. 0.5 means 0.5%)
@@ -102,7 +103,6 @@ export const settleRidePayment = async (req: Request, res: Response, next: NextF
 
     // Emit payment success to user and driver
     // Assumes socket.io instance stored in app: app.set("io", io)
-    const io: any = (req.app as any)?.get?.("io")
     const payload = {
       rideId: String(ride._id),
       userId: String(ride.user),
@@ -113,16 +113,12 @@ export const settleRidePayment = async (req: Request, res: Response, next: NextF
       netAmount,
       status: "success",
     }
-
+    console.log(ride.user)
+    console.log(ride.driver)
     // Targeted rooms if your app uses rooms like `user:<id>` and `driver:<id>`
-    if (io?.to) {
-      io.to(`user:${ride.user}`).emit("payment:success", payload)
-      io.to(`driver:${ride.driver}`).emit("payment:success", payload)
-    }
-    // Fallback: global emit if rooms are not used
-    else if (io?.emit) {
-      io.emit("payment:success", payload)
-    }
+    const io = getIoInstance();
+    io.to(ride.user.toString()).emit("payment:success", payload)
+    io.to(ride.driver.toString()).emit("payment:success", payload)
 
     return res.status(200).json({
       success: true,
