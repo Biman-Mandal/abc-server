@@ -22,6 +22,7 @@ export interface IDriver {
   smokeCheckStatus: "passed" | "failed" | "pending";
   smokeTestDate: Date;
 
+  licenseNumber?: string;
   profileImage?: string;
   documents?: {
     license?: string;

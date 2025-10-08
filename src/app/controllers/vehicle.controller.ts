@@ -61,8 +61,10 @@ export const getAllVehicles = async (
   next: NextFunction
 ) => {
   try {
-    const filter = { isActive: true };
-    
+    let filter: Record<string, any> = { isActive: true };
+    if (req.query.vehicleType === "all") {
+      filter = {};
+    }
     const vehicles = await Vehicle.find(filter)
       .populate('vehicleTypeId', 'name')
       .select("-__v")

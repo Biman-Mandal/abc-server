@@ -45,7 +45,10 @@ const driverSchema = new Schema<IDriver, DriverModelType>(
       enum: ["bike", "car", "truck", "bus", "auto", "toto"],
       required: false, // previously required: true
     },
-
+    licenseNumber:{
+      type: String,
+      required: false,
+    },
     vehicleNumber: {
       type: String,
       trim: true,

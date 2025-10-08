@@ -1,9 +1,14 @@
-import { Request, Response, NextFunction } from "express";
+import type { Request, Response, NextFunction, Express } from "express";
 import mongoose from "mongoose";
-import { IDriver } from "../../interfaces/driver.interface";
+import type { IDriver } from "../../interfaces/driver.interface";
 import { Driver } from "../../models/driver.model";
 import Credit from "../../models/credit.model";
+import Vehicle from "../../models/vehicle.model";
+import VehicleType from "../../models/vehicleType.model";
 
+/**
+ * ✅ CREATE DRIVER (Admin)
+ */
 export const createDriverByAdmin = async (
   req: Request,
   res: Response,
@@ -12,6 +17,81 @@ export const createDriverByAdmin = async (
   try {
     const driverData: Partial<IDriver> = req.body;
 
+    const {
+      vehicleTypeId,
+      vehicleId,
+      phone,
+      email,
+      licenseNumber,
+      vehicleNumber,
+    } = req.body as {
+      vehicleTypeId?: string;
+      vehicleId?: string;
+      phone?: string;
+      email?: string;
+      licenseNumber?: string;
+      vehicleNumber?: string;
+    };
+
+    // ✅ Check required vehicle fields
+    if (!vehicleTypeId || !vehicleId) {
+      return res.status(400).json({
+        success: false,
+        message: "vehicleTypeId and vehicleId are required",
+      });
+    }
+
+    // ✅ Unique validation (email, phone, licenseNumber, vehicleNumber)
+    const existingDriver = await Driver.findOne({
+      $or: [
+        email ? { email } : {},
+        phone ? { phone } : {},
+        vehicleNumber ? { vehicleNumber } : {},
+      ],
+    });
+    if (existingDriver) {
+      let field = "";
+      if (existingDriver.email === email) field = "email";
+      else if (existingDriver.phone === phone) field = "phone";
+      else if (existingDriver.vehicleNumber === vehicleNumber)
+        field = "vehicleNumber";
+      return res.status(409).json({
+        success: false,
+        message: `Driver with this ${field} already exists.`,
+      });
+    }
+
+    // ✅ Validate Vehicle Type
+    const vt = await VehicleType.findOne({
+      _id: vehicleTypeId,
+      isActive: true,
+    });
+    if (!vt) {
+      return res.status(404).json({
+        success: false,
+        message: "Vehicle type not found",
+      });
+    }
+
+    // ✅ Validate Vehicle
+    const v = await Vehicle.findOne({ _id: vehicleId, isActive: true });
+    if (!v) {
+      return res.status(404).json({
+        success: false,
+        message: "Vehicle not found",
+      });
+    }
+
+    driverData.vehicleTypeId = new mongoose.Types.ObjectId(
+      vehicleTypeId
+    ) as any;
+    driverData.vehicleId = new mongoose.Types.ObjectId(vehicleId) as any;
+
+    if ((driverData as any).vehicleType) {
+      delete (driverData as any).vehicleType;
+    }
+
+    // ✅ File Uploads
     if (req.files) {
       const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
@@ -34,9 +114,11 @@ export const createDriverByAdmin = async (
       };
     }
 
+    // ✅ Create Driver
     const newDriver = new Driver(driverData);
     await newDriver.save();
 
+    // ✅ Create Credit Wallet
     const creditWallet = new Credit({
       driver: newDriver._id,
       balance: 0,
@@ -46,15 +128,24 @@ export const createDriverByAdmin = async (
 
     res.status(201).json({
       success: true,
-      message:
-        "Driver created successfully and credit wallet has been activated.",
+      message: "Driver created successfully and credit wallet activated.",
       data: newDriver,
     });
-  } catch (error) {
+  } catch (error: any) {
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      return res.status(409).json({
+        success: false,
+        message: `Duplicate ${field}. Please use a unique ${field}.`,
+      });
+    }
     next(error);
   }
 };
 
+/**
+ * ✅ GET ALL DRIVERS
+ */
 export const getAllDrivers = async (
   req: Request,
   res: Response,
@@ -80,7 +171,8 @@ export const getAllDrivers = async (
         $project: {
           driverName: 1,
           phone: 1,
-          vehicleType: 1,
+          vehicleTypeId: 1,
+          vehicleId: 1,
           isApproved: 1,
           isBanned: 1,
           isOnline: 1,
@@ -103,6 +195,9 @@ export const getAllDrivers = async (
   }
 };
 
+/**
+ * ✅ GET DRIVER BY ID
+ */
 export const getDriverById = async (
   req: Request,
   res: Response,
@@ -113,36 +208,104 @@ export const getDriverById = async (
       .lean()
       .select("-password");
     if (!driver) {
-      res.status(404).json({ success: false, message: "Driver not found." });
-      return;
+      return res
+        .status(404)
+        .json({ success: false, message: "Driver not found." });
     }
 
     const creditWallet = await Credit.findOne({ driver: driver._id }).lean();
 
-    const responseData = {
-      ...driver,
-      creditBalance: creditWallet ? creditWallet.balance : 0,
-      creditTransactions: creditWallet ? creditWallet.transactions : [],
-    };
-
     res.status(200).json({
       success: true,
       message: "Driver details fetched successfully.",
-      data: responseData,
+      data: {
+        ...driver,
+        creditBalance: creditWallet ? creditWallet.balance : 0,
+        creditTransactions: creditWallet ? creditWallet.transactions : [],
+      },
     });
   } catch (error) {
     next(error);
   }
 };
 
+/**
+ * ✅ UPDATE DRIVER BY ID
+ */
 export const updateDriverById = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
+    const driverId = req.params.id;
     const updateData: Partial<IDriver> = req.body;
 
+    const { phone, email, licenseNumber, vehicleNumber } = req.body;
+
+    const existingDriver = await Driver.findById(driverId);
+    if (!existingDriver) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Driver not found." });
+    }
+
+    // ✅ Unique validation (exclude self)
+    if (phone || email || licenseNumber || vehicleNumber) {
+      const duplicate = await Driver.findOne({
+        _id: { $ne: driverId },
+        $or: [
+          phone ? { phone } : {},
+          email ? { email } : {},
+          vehicleNumber ? { vehicleNumber } : {},
+        ],
+      });
+
+      if (duplicate) {
+        let field = "";
+        if (duplicate.email === email) field = "email";
+        else if (duplicate.phone === phone) field = "phone";
+        else if (duplicate.vehicleNumber === vehicleNumber)
+          field = "vehicleNumber";
+
+        return res.status(409).json({
+          success: false,
+          message: `Another driver with this ${field} already exists.`,
+        });
+      }
+    }
+
+    // ✅ Validate Vehicle Type
+    if ((updateData as any).vehicleTypeId) {
+      const vt = await VehicleType.findOne({
+        _id: (updateData as any).vehicleTypeId,
+        isActive: true,
+      });
+      if (!vt) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Vehicle type not found" });
+      }
+    }
+
+    // ✅ Validate Vehicle
+    if ((updateData as any).vehicleId) {
+      const v = await Vehicle.findOne({
+        _id: (updateData as any).vehicleId,
+        isActive: true,
+      });
+      if (!v) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Vehicle not found" });
+      }
+    }
+
+    if ((updateData as any).vehicleType) {
+      delete (updateData as any).vehicleType;
+    }
+
+    // ✅ File Uploads
     if (req.files) {
       const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
@@ -165,27 +328,30 @@ export const updateDriverById = async (
       };
     }
 
-    const updatedDriver = await Driver.findByIdAndUpdate(
-      req.params.id,
-      updateData,
-      { new: true }
-    );
-
-    if (!updatedDriver) {
-      res.status(404).json({ success: false, message: "Driver not found." });
-      return;
-    }
+    const updatedDriver = await Driver.findByIdAndUpdate(driverId, updateData, {
+      new: true,
+    });
 
     res.status(200).json({
       success: true,
       message: "Driver details updated successfully.",
       data: updatedDriver,
     });
-  } catch (error) {
+  } catch (error: any) {
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      return res.status(409).json({
+        success: false,
+        message: `Duplicate ${field}. Please use a unique ${field}.`,
+      });
+    }
     next(error);
   }
 };
 
+/**
+ * ✅ DELETE DRIVER
+ */
 export const deleteDriverById = async (
   req: Request,
   res: Response,
@@ -194,21 +360,25 @@ export const deleteDriverById = async (
   try {
     const deletedDriver = await Driver.findByIdAndDelete(req.params.id);
     if (!deletedDriver) {
-      res.status(404).json({ success: false, message: "Driver not found." });
-      return;
+      return res
+        .status(404)
+        .json({ success: false, message: "Driver not found." });
     }
 
     await Credit.deleteOne({ driver: deletedDriver._id });
 
     res.status(200).json({
       success: true,
-      message: "Driver and their credit wallet have been deleted successfully.",
+      message: "Driver and their credit wallet deleted successfully.",
     });
   } catch (error) {
     next(error);
   }
 };
 
+/**
+ * ✅ ADD CREDITS TO DRIVER
+ */
 export const addCreditsToDriver = async (
   req: Request,
   res: Response,
@@ -219,11 +389,10 @@ export const addCreditsToDriver = async (
     const { amount } = req.body;
 
     if (typeof amount !== "number" || amount <= 0) {
-      res.status(400).json({
+      return res.status(400).json({
         success: false,
         message: "Please provide a valid credit amount.",
       });
-      return;
     }
 
     let creditWallet = await Credit.findOne({ driver: driverId });
@@ -231,8 +400,9 @@ export const addCreditsToDriver = async (
     if (!creditWallet) {
       const driverExists = await Driver.findById(driverId);
       if (!driverExists) {
-        res.status(404).json({ success: false, message: "Driver not found." });
-        return;
+        return res
+          .status(404)
+          .json({ success: false, message: "Driver not found." });
       }
 
       creditWallet = new Credit({
@@ -243,7 +413,6 @@ export const addCreditsToDriver = async (
     }
 
     creditWallet.balance += amount;
-
     creditWallet.transactions.push({
       amount: amount,
       type: "add_credit",
@@ -262,6 +431,9 @@ export const addCreditsToDriver = async (
   }
 };
 
+/**
+ * ✅ GET DRIVER CREDIT HISTORY
+ */
 export const getCreditHistoryByDriverId = async (
   req: Request,
   res: Response,
@@ -272,11 +444,10 @@ export const getCreditHistoryByDriverId = async (
     const creditWallet = await Credit.findOne({ driver: driverId }).lean();
 
     if (!creditWallet) {
-      res.status(404).json({
+      return res.status(404).json({
         success: false,
         message: "No credit wallet found for this driver.",
       });
-      return;
     }
 
     res.status(200).json({

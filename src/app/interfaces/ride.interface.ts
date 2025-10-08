@@ -22,4 +22,6 @@ export interface IRide extends Document {
     | "driver-not-found";
   fare?: number;
   estimatedTime?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
