@@ -23,6 +23,7 @@ import userRoutes from "./app/routes/user.route";
 import ratingRoutes from "./app/routes/rating.route";
 import rideRoutes from "./app/routes/admin/ride.route";
 import driverRoutes from "./app/routes/driver.route";
+import creditRoute from "./app/routes/credit.route";
 
 export const app: Application = express();
 
@@ -54,6 +55,7 @@ app.use("/api/vehicles", vehicleRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/rating", ratingRoutes);
 app.use("/api/driver", driverRoutes);
+app.use("/api/credit", creditRoute);
 
 app.get("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
